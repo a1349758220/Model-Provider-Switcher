@@ -225,7 +225,7 @@ function formatTokens(value) {
 
 function shortTitle(value) {
   const text = value || "";
-  return text.length > 30 ? `${text.slice(0, 30)}...` : text;
+  return text.length > 38 ? `${text.slice(0, 38)}...` : text;
 }
 
 function openTitleDialog(value) {
@@ -298,6 +298,10 @@ function renderRows() {
     if (!item.rollout_exists) {
       rolloutProvider.textContent = "文件不存在";
       rolloutProvider.className = "missing";
+    }
+    if (item.model_provider !== item.rollout_provider) {
+      provider.classList.add("owner-mismatch");
+      rolloutProvider.classList.add("owner-mismatch");
     }
 
     const tokens = document.createElement("td");

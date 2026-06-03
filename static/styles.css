@@ -261,6 +261,11 @@ tr:hover td {
   background: #f8fafc;
 }
 
+td.owner-mismatch,
+tr:hover td.owner-mismatch {
+  background: #fff6cc;
+}
+
 .mono {
   font-family: Consolas, "Cascadia Mono", monospace;
   word-break: break-all;
