@@ -45,6 +45,9 @@ const closeDeleteArchivedDialogBtn = document.querySelector("#closeDeleteArchive
 const cancelDeleteArchivedBtn = document.querySelector("#cancelDeleteArchivedBtn");
 const confirmDeleteArchivedBtn = document.querySelector("#confirmDeleteArchivedBtn");
 const deleteArchivedConfirmInput = document.querySelector("#deleteArchivedConfirmInput");
+const titleDialog = document.querySelector("#titleDialog");
+const closeTitleDialogBtn = document.querySelector("#closeTitleDialogBtn");
+const fullTitleText = document.querySelector("#fullTitleText");
 const editorWrap = document.querySelector("#editorWrap");
 const wrapToggle = document.querySelector("#wrapToggle");
 const pageSizeSelect = document.querySelector("#pageSizeSelect");
@@ -220,6 +223,18 @@ function formatTokens(value) {
   return Number.isFinite(number) ? number.toLocaleString() : "0";
 }
 
+function shortTitle(value) {
+  const text = value || "";
+  return text.length > 30 ? `${text.slice(0, 30)}...` : text;
+}
+
+function openTitleDialog(value) {
+  fullTitleText.textContent = value || "";
+  if (!titleDialog.open) {
+    titleDialog.showModal();
+  }
+}
+
 function selectedIds() {
   return [...document.querySelectorAll("tbody input[type='checkbox']:checked")].map((box) => box.value);
 }
@@ -266,7 +281,11 @@ function renderRows() {
     checkCell.append(check);
 
     const title = document.createElement("td");
-    title.textContent = item.title || item.id;
+    const fullTitle = item.title || item.id;
+    title.className = "title-cell";
+    title.textContent = shortTitle(fullTitle);
+    title.title = "双击查看完整标题";
+    title.addEventListener("dblclick", () => openTitleDialog(fullTitle));
 
     const provider = document.createElement("td");
     const providerBadge = document.createElement("span");
@@ -705,6 +724,7 @@ confirmClearBtn.addEventListener("click", clearAllBackups);
 closeDeleteArchivedDialogBtn.addEventListener("click", () => deleteArchivedDialog.close());
 cancelDeleteArchivedBtn.addEventListener("click", () => deleteArchivedDialog.close());
 confirmDeleteArchivedBtn.addEventListener("click", deleteSelectedArchived);
+closeTitleDialogBtn.addEventListener("click", () => titleDialog.close());
 wrapToggle.addEventListener("change", applyWrapMode);
 pageSizeSelect.addEventListener("change", changePageSize);
 prevPageBtn.addEventListener("click", () => goToPage(state.page - 1));

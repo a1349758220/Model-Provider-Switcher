@@ -271,6 +271,18 @@ tr:hover td {
   font-variant-numeric: tabular-nums;
 }
 
+.title-cell {
+  cursor: zoom-in;
+}
+
+.full-title {
+  color: #20242a;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .pagination-bar {
   display: flex;
   align-items: center;
