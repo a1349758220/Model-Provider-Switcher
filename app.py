@@ -10,11 +10,53 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 
-CODEX_HOME = Path(r"C:\Users\Administrator\.codex")
-DB_PATH = CODEX_HOME / "state_6.sqlite"
-BACKUP_ROOT = CODEX_HOME / "backups" / "model-provider-switcher"
 APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
+DB_FILE_NAME = "state_5.sqlite"
+
+
+def codex_dir_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    for env_name in ("CODEX_HOME", "CODEX_CONFIG_HOME", "CODEX_DATA_HOME"):
+        value = os.environ.get(env_name)
+        if value:
+            candidates.append(Path(value))
+
+    home = Path.home()
+    candidates.append(home / ".codex")
+
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(Path(appdata) / "Codex")
+
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        candidates.append(Path(local_appdata) / "Codex")
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for item in candidates:
+        key = str(item).casefold()
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
+
+
+def locate_codex_home() -> Path:
+    checked: list[str] = []
+    for path in codex_dir_candidates():
+        checked.append(str(path))
+        if (path / DB_FILE_NAME).is_file():
+            return path
+    raise FileNotFoundError(
+        f"Could not find {DB_FILE_NAME}. Checked: {', '.join(checked)}"
+    )
+
+
+CODEX_HOME = locate_codex_home()
+DB_PATH = CODEX_HOME / DB_FILE_NAME
+BACKUP_ROOT = CODEX_HOME / "backups" / "model-provider-switcher"
 
 
 def connect() -> sqlite3.Connection:
@@ -65,24 +107,40 @@ def get_thread(thread_id: str) -> dict:
     return dict(row)
 
 
-def thread_rows(search: str, limit: int) -> list[dict]:
-    sql = """
-        SELECT id, title, model_provider, rollout_path, updated_at, cwd, source
-        FROM threads
-    """
-    params: list[object] = []
+def thread_filters(search: str, archived_only: bool) -> tuple[list[str], list[object]]:
+    filters = ["archived = ?"]
+    params: list[object] = [1 if archived_only else 0]
     if search:
-        sql += """
-            WHERE id LIKE ?
-               OR title LIKE ?
-               OR model_provider LIKE ?
-               OR cwd LIKE ?
-               OR rollout_path LIKE ?
-        """
+        filters.append(
+            """
+            (id LIKE ?
+             OR title LIKE ?
+             OR model_provider LIKE ?
+             OR cwd LIKE ?
+             OR rollout_path LIKE ?)
+            """
+        )
         term = f"%{search}%"
         params.extend([term, term, term, term, term])
-    sql += " ORDER BY updated_at DESC LIMIT ?"
-    params.append(limit)
+    return filters, params
+
+
+def count_threads(search: str, archived_only: bool) -> int:
+    filters, params = thread_filters(search, archived_only)
+    sql = "SELECT COUNT(*) FROM threads WHERE " + " AND ".join(filters)
+    with connect() as con:
+        return int(con.execute(sql, params).fetchone()[0])
+
+
+def thread_rows(search: str, limit: int, offset: int, archived_only: bool) -> list[dict]:
+    sql = """
+        SELECT id, title, model_provider, rollout_path, updated_at, cwd, source, tokens_used, archived
+        FROM threads
+    """
+    filters, params = thread_filters(search, archived_only)
+    sql += " WHERE " + " AND ".join(filters)
+    sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
 
     with connect() as con:
         rows = [dict(row) for row in con.execute(sql, params)]
@@ -92,6 +150,96 @@ def thread_rows(search: str, limit: int) -> list[dict]:
         row["rollout_exists"] = rollout.is_file()
         row["rollout_provider"] = read_rollout_provider(rollout) if row["rollout_exists"] else None
     return rows
+
+
+def delete_archived_threads(ids: list[str], confirm_text: str) -> dict:
+    if confirm_text != "确认删除":
+        raise ValueError("confirm_text must be 确认删除")
+    if not ids:
+        raise ValueError("ids is required")
+
+    placeholders = ",".join("?" for _ in ids)
+    with connect() as con:
+        rows = [
+            dict(row)
+            for row in con.execute(
+                f"SELECT id, archived FROM threads WHERE id IN ({placeholders})",
+                ids,
+            )
+        ]
+
+    found_ids = {row["id"] for row in rows}
+    missing_ids = [thread_id for thread_id in ids if thread_id not in found_ids]
+    if missing_ids:
+        raise ValueError(f"thread id not found: {', '.join(missing_ids)}")
+
+    not_archived = [row["id"] for row in rows if row["archived"] != 1]
+    if not_archived:
+        raise ValueError(f"thread is not archived: {', '.join(not_archived)}")
+
+    target_dir = timestamp_dir()
+    db_backup = backup_database(target_dir)
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            con.execute(f"DELETE FROM threads WHERE archived = 1 AND id IN ({placeholders})", ids)
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+
+    return {
+        "deleted": len(rows),
+        "db_backup": str(db_backup),
+    }
+
+
+def archive_threads(ids: list[str]) -> dict:
+    if not ids:
+        raise ValueError("ids is required")
+
+    placeholders = ",".join("?" for _ in ids)
+    with connect() as con:
+        rows = [
+            dict(row)
+            for row in con.execute(
+                f"SELECT id, archived FROM threads WHERE id IN ({placeholders})",
+                ids,
+            )
+        ]
+
+    found_ids = {row["id"] for row in rows}
+    missing_ids = [thread_id for thread_id in ids if thread_id not in found_ids]
+    if missing_ids:
+        raise ValueError(f"thread id not found: {', '.join(missing_ids)}")
+
+    already_archived = [row["id"] for row in rows if row["archived"] != 0]
+    if already_archived:
+        raise ValueError(f"thread is already archived: {', '.join(already_archived)}")
+
+    target_dir = timestamp_dir()
+    db_backup = backup_database(target_dir)
+    now = int(time.time())
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            con.execute(
+                f"""
+                UPDATE threads
+                SET archived = 1, archived_at = ?, updated_at = ?
+                WHERE archived = 0 AND id IN ({placeholders})
+                """,
+                [now, now, *ids],
+            )
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+
+    return {
+        "archived": len(rows),
+        "db_backup": str(db_backup),
+    }
 
 
 def read_rollout_provider(path: Path) -> str | None:
@@ -109,7 +257,7 @@ def read_rollout_provider(path: Path) -> str | None:
 
 
 def backup_database(target_dir: Path) -> Path:
-    target = target_dir / "state_6.sqlite"
+    target = target_dir / DB_PATH.name
     with connect() as src:
         dst = sqlite3.connect(target)
         try:
@@ -402,9 +550,27 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/threads":
                 query = parse_qs(parsed.query)
                 search = query.get("search", [""])[0]
-                limit_text = query.get("limit", ["100"])[0]
-                limit = max(1, min(500, int(limit_text)))
-                json_response(self, 200, {"db_path": str(DB_PATH), "threads": thread_rows(search, limit)})
+                archived_only = query.get("archived", ["0"])[0] == "1"
+                page = max(1, int(query.get("page", ["1"])[0]))
+                page_size = int(query.get("page_size", ["5"])[0])
+                if page_size not in {5, 10, 20}:
+                    page_size = 5
+                total = count_threads(search, archived_only)
+                max_page = max(1, (total + page_size - 1) // page_size)
+                page = min(page, max_page)
+                offset = (page - 1) * page_size
+                json_response(
+                    self,
+                    200,
+                    {
+                        "db_path": str(DB_PATH),
+                        "archived": archived_only,
+                        "page": page,
+                        "page_size": page_size,
+                        "total": total,
+                        "threads": thread_rows(search, page_size, offset, archived_only),
+                    },
+                )
                 return
             if parsed.path == "/api/providers":
                 json_response(self, 200, {"providers": providers()})
@@ -438,6 +604,13 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("ids must be a string array")
                 result = update_threads(ids, provider)
                 json_response(self, 200, result)
+                return
+            if path == "/api/threads/archive":
+                data = read_body(self)
+                ids = data.get("ids")
+                if not isinstance(ids, list) or not all(isinstance(item, str) for item in ids):
+                    raise ValueError("ids must be a string array")
+                json_response(self, 200, archive_threads(ids))
                 return
             if path == "/api/rollout/save":
                 data = read_body(self)
@@ -474,6 +647,16 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(confirm_text, str):
                     raise ValueError("confirm_text must be a string")
                 json_response(self, 200, cleanup_backups_all(confirm_text))
+                return
+            if path == "/api/threads/delete-archived":
+                data = read_body(self)
+                ids = data.get("ids")
+                confirm_text = data.get("confirm_text")
+                if not isinstance(ids, list) or not all(isinstance(item, str) for item in ids):
+                    raise ValueError("ids must be a string array")
+                if not isinstance(confirm_text, str):
+                    raise ValueError("confirm_text must be a string")
+                json_response(self, 200, delete_archived_threads(ids, confirm_text))
                 return
             else:
                 json_response(self, 404, {"error": "not found"})

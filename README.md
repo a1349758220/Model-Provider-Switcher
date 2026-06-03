@@ -8,7 +8,8 @@ Only Windows is supported.
 
 This is a small browser-server tool for updating:
 
-- `C:\Users\Administrator\.codex\state_6.sqlite`
+- Codex Desktop user data / config directory, detected at startup
+- database file: `state_5.sqlite`
 - table: `threads`
 - column: `model_provider`
 - rollout JSONL file from column: `rollout_path`

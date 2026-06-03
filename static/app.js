@@ -1,13 +1,21 @@
 const state = {
   threads: [],
+  page: 1,
+  pageSize: 5,
+  total: 0,
 };
 
 const dbPath = document.querySelector("#dbPath");
+const threadTable = document.querySelector("#threadTable");
 const threadBody = document.querySelector("#threadBody");
 const searchInput = document.querySelector("#searchInput");
+const providerControl = document.querySelector("#providerControl");
 const providerInput = document.querySelector("#providerInput");
 const refreshBtn = document.querySelector("#refreshBtn");
 const applyBtn = document.querySelector("#applyBtn");
+const selectArchivedBtn = document.querySelector("#selectArchivedBtn");
+const toggleArchivedBtn = document.querySelector("#toggleArchivedBtn");
+const deleteArchivedBtn = document.querySelector("#deleteArchivedBtn");
 const selectAll = document.querySelector("#selectAll");
 const message = document.querySelector("#message");
 const providerList = document.querySelector("#providerList");
@@ -26,17 +34,28 @@ const locateMatchBtn = document.querySelector("#locateMatchBtn");
 const openBackupBtn = document.querySelector("#openBackupBtn");
 const keepBackupsBtn = document.querySelector("#keepBackupsBtn");
 const clearBackupsBtn = document.querySelector("#clearBackupsBtn");
+const backupActions = document.querySelector("#backupActions");
 const clearBackupDialog = document.querySelector("#clearBackupDialog");
 const closeClearDialogBtn = document.querySelector("#closeClearDialogBtn");
 const cancelClearBtn = document.querySelector("#cancelClearBtn");
 const confirmClearBtn = document.querySelector("#confirmClearBtn");
 const clearConfirmInput = document.querySelector("#clearConfirmInput");
+const deleteArchivedDialog = document.querySelector("#deleteArchivedDialog");
+const closeDeleteArchivedDialogBtn = document.querySelector("#closeDeleteArchivedDialogBtn");
+const cancelDeleteArchivedBtn = document.querySelector("#cancelDeleteArchivedBtn");
+const confirmDeleteArchivedBtn = document.querySelector("#confirmDeleteArchivedBtn");
+const deleteArchivedConfirmInput = document.querySelector("#deleteArchivedConfirmInput");
 const editorWrap = document.querySelector("#editorWrap");
 const wrapToggle = document.querySelector("#wrapToggle");
+const pageSizeSelect = document.querySelector("#pageSizeSelect");
+const pageStatus = document.querySelector("#pageStatus");
+const prevPageBtn = document.querySelector("#prevPageBtn");
+const nextPageBtn = document.querySelector("#nextPageBtn");
 
 let currentEditorId = null;
 let modelProviderMatches = [];
 let currentMatchIndex = 0;
+let archivedMode = false;
 
 function setMessage(text, isError = false) {
   message.textContent = text;
@@ -196,8 +215,43 @@ function formatTime(seconds) {
   return date.toLocaleString();
 }
 
+function formatTokens(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? number.toLocaleString() : "0";
+}
+
 function selectedIds() {
   return [...document.querySelectorAll("tbody input[type='checkbox']:checked")].map((box) => box.value);
+}
+
+function visibleCheckboxes() {
+  return [...document.querySelectorAll("tbody input[type='checkbox']")];
+}
+
+function selectVisibleRows() {
+  visibleCheckboxes().forEach((box) => {
+    box.checked = true;
+  });
+  selectAll.checked = visibleCheckboxes().length > 0;
+}
+
+function renderArchiveControls() {
+  toggleArchivedBtn.textContent = archivedMode ? "返回未归档区" : "查看归档区";
+  deleteArchivedBtn.classList.toggle("hidden", !archivedMode);
+  applyBtn.classList.toggle("hidden", archivedMode);
+  selectArchivedBtn.classList.toggle("hidden", archivedMode);
+  providerControl.classList.toggle("hidden", archivedMode);
+  backupActions.classList.toggle("hidden", archivedMode);
+}
+
+function renderPagination() {
+  const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+  const start = state.total === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
+  const end = Math.min(state.total, state.page * state.pageSize);
+  pageStatus.textContent = `第 ${state.page} / ${totalPages} 页，${start}-${end} / ${state.total} 条`;
+  prevPageBtn.disabled = state.page <= 1;
+  nextPageBtn.disabled = state.page >= totalPages;
+  pageSizeSelect.value = String(state.pageSize);
 }
 
 function renderRows() {
@@ -227,6 +281,10 @@ function renderRows() {
       rolloutProvider.className = "missing";
     }
 
+    const tokens = document.createElement("td");
+    tokens.className = "number-cell";
+    tokens.textContent = formatTokens(item.tokens_used);
+
     const updated = document.createElement("td");
     updated.textContent = formatTime(item.updated_at);
 
@@ -235,11 +293,12 @@ function renderRows() {
     cwd.textContent = item.cwd;
 
     const rollout = document.createElement("td");
-    const pathCell = document.createElement("div");
-    pathCell.className = "path-cell";
     const pathText = document.createElement("div");
-    pathText.className = "mono";
+    pathText.className = "mono path-text";
     pathText.textContent = item.rollout_path;
+    rollout.append(pathText);
+
+    const actions = document.createElement("td");
     const pathActions = document.createElement("div");
     pathActions.className = "path-actions";
     const editButton = document.createElement("button");
@@ -251,33 +310,75 @@ function renderRows() {
     selectButton.textContent = "选择文件";
     selectButton.addEventListener("click", () => selectRolloutFile(item.id));
     pathActions.append(editButton, selectButton);
-    pathCell.append(pathText, pathActions);
-    rollout.append(pathCell);
+    actions.append(pathActions);
 
-    row.append(checkCell, title, provider, rolloutProvider, updated, cwd, rollout);
+    row.append(checkCell, title, provider, rolloutProvider, tokens, updated, cwd, rollout, actions);
     threadBody.append(row);
   }
   selectAll.checked = false;
+  renderPagination();
 }
 
 async function loadThreads() {
   refreshBtn.disabled = true;
   setMessage("加载中...");
   try {
-    const params = new URLSearchParams({ search: searchInput.value.trim(), limit: "200" });
+    const params = new URLSearchParams({
+      search: searchInput.value.trim(),
+      page: String(state.page),
+      page_size: String(state.pageSize),
+      archived: archivedMode ? "1" : "0",
+    });
     const res = await fetch(`/api/threads?${params.toString()}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "加载失败");
     state.threads = data.threads;
+    state.page = data.page;
+    state.pageSize = data.page_size;
+    state.total = data.total;
     dbPath.textContent = data.db_path;
     renderRows();
+    renderArchiveControls();
     renderProviderOptions(data.threads.map((item) => item.model_provider));
-    setMessage(`已加载 ${state.threads.length} 条记录`);
+    setMessage(`${archivedMode ? "归档区" : "未归档区"}已加载 ${state.threads.length} 条记录`);
   } catch (error) {
     setMessage(error.message, true);
   } finally {
     refreshBtn.disabled = false;
   }
+}
+
+async function archiveSelectedThreads() {
+  if (archivedMode) return;
+  const ids = selectedIds();
+  if (ids.length === 0) {
+    setMessage("请先勾选至少一条未归档记录", true);
+    return;
+  }
+
+  selectArchivedBtn.disabled = true;
+  setMessage("正在归档选中记录...");
+  try {
+    const res = await fetch("/api/threads/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "归档失败");
+    await loadThreads();
+    setMessage(`已归档 ${data.archived} 条记录；数据库备份：${data.db_backup}`);
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    selectArchivedBtn.disabled = false;
+  }
+}
+
+async function toggleArchivedMode() {
+  archivedMode = !archivedMode;
+  state.page = 1;
+  await loadThreads();
 }
 
 async function applyProvider() {
@@ -469,13 +570,126 @@ async function clearAllBackups() {
   }
 }
 
+function openDeleteArchivedDialog() {
+  if (!archivedMode) return;
+  selectVisibleRows();
+  if (selectedIds().length === 0) {
+    setMessage("归档区没有可删除的记录", true);
+    return;
+  }
+  deleteArchivedConfirmInput.value = "";
+  if (!deleteArchivedDialog.open) {
+    deleteArchivedDialog.showModal();
+  }
+  deleteArchivedConfirmInput.focus();
+}
+
+async function deleteSelectedArchived() {
+  const ids = selectedIds();
+  const confirmText = deleteArchivedConfirmInput.value;
+  if (confirmText !== "确认删除") {
+    setMessage("确认文本不匹配，必须输入：确认删除", true);
+    return;
+  }
+  if (ids.length === 0) {
+    setMessage("请先勾选至少一条归档记录", true);
+    return;
+  }
+
+  confirmDeleteArchivedBtn.disabled = true;
+  try {
+    const res = await fetch("/api/threads/delete-archived", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, confirm_text: confirmText }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "删除归档记录失败");
+    deleteArchivedDialog.close();
+    await loadThreads();
+    setMessage(`已删除 ${data.deleted} 条归档记录；数据库备份：${data.db_backup}`);
+  } catch (error) {
+    setMessage(error.message, true);
+  } finally {
+    confirmDeleteArchivedBtn.disabled = false;
+  }
+}
+
+function goToPage(page) {
+  state.page = Math.max(1, page);
+  loadThreads();
+}
+
+function changePageSize() {
+  state.pageSize = Number(pageSizeSelect.value);
+  state.page = 1;
+  loadThreads();
+}
+
+function columnStorageKey(column) {
+  return `threadColumnWidth:${column}`;
+}
+
+function applyColumnWidth(column, width) {
+  const col = threadTable.querySelector(`col[data-column="${column}"]`);
+  if (!col) return;
+  col.style.width = `${width}px`;
+}
+
+function initializeColumnWidths() {
+  threadTable.querySelectorAll("col[data-column]").forEach((col) => {
+    const column = col.dataset.column;
+    const stored = Number(localStorage.getItem(columnStorageKey(column)));
+    if (stored >= 80) {
+      applyColumnWidth(column, stored);
+    }
+  });
+}
+
+function initializeColumnResizers() {
+  document.querySelectorAll("th[data-resizable]").forEach((header) => {
+    const column = header.dataset.resizable;
+    const handle = document.createElement("span");
+    handle.className = "column-resizer";
+    handle.setAttribute("aria-hidden", "true");
+    header.append(handle);
+
+    handle.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = header.getBoundingClientRect().width;
+
+      const onMove = (moveEvent) => {
+        const nextWidth = Math.max(80, Math.round(startWidth + moveEvent.clientX - startX));
+        applyColumnWidth(column, nextWidth);
+      };
+
+      const onUp = () => {
+        const width = Math.round(header.getBoundingClientRect().width);
+        localStorage.setItem(columnStorageKey(column), String(width));
+        document.body.classList.remove("resizing-column");
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+
+      document.body.classList.add("resizing-column");
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+  });
+}
+
 let timer = null;
 searchInput.addEventListener("input", () => {
   window.clearTimeout(timer);
+  state.page = 1;
   timer = window.setTimeout(loadThreads, 250);
 });
 refreshBtn.addEventListener("click", loadThreads);
 applyBtn.addEventListener("click", applyProvider);
+selectArchivedBtn.addEventListener("click", archiveSelectedThreads);
+toggleArchivedBtn.addEventListener("click", toggleArchivedMode);
+deleteArchivedBtn.addEventListener("click", openDeleteArchivedDialog);
 providerInput.addEventListener("change", () => rememberProvider(providerInput.value));
 closeEditorBtn.addEventListener("click", () => rolloutDialog.close());
 saveRolloutBtn.addEventListener("click", saveRolloutContent);
@@ -488,7 +702,13 @@ clearBackupsBtn.addEventListener("click", openClearBackupDialog);
 closeClearDialogBtn.addEventListener("click", () => clearBackupDialog.close());
 cancelClearBtn.addEventListener("click", () => clearBackupDialog.close());
 confirmClearBtn.addEventListener("click", clearAllBackups);
+closeDeleteArchivedDialogBtn.addEventListener("click", () => deleteArchivedDialog.close());
+cancelDeleteArchivedBtn.addEventListener("click", () => deleteArchivedDialog.close());
+confirmDeleteArchivedBtn.addEventListener("click", deleteSelectedArchived);
 wrapToggle.addEventListener("change", applyWrapMode);
+pageSizeSelect.addEventListener("change", changePageSize);
+prevPageBtn.addEventListener("click", () => goToPage(state.page - 1));
+nextPageBtn.addEventListener("click", () => goToPage(state.page + 1));
 rolloutEditor.addEventListener("input", renderHighlights);
 rolloutEditor.addEventListener("scroll", () => {
   highlightLayer.scrollTop = rolloutEditor.scrollTop;
@@ -501,6 +721,8 @@ selectAll.addEventListener("change", () => {
 });
 
 renderProviderOptions();
+initializeColumnWidths();
+initializeColumnResizers();
 wrapToggle.checked = localStorage.getItem("rolloutEditorWrap") !== "0";
 applyWrapMode();
 loadThreads();

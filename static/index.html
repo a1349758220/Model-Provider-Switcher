@@ -21,7 +21,7 @@
           搜索
           <input id="searchInput" type="search" placeholder="id / title / provider / cwd / rollout_path" />
         </label>
-        <label>
+        <label id="providerControl">
           新 model_provider
           <input id="providerInput" type="text" value="openai" list="providerList" />
           <datalist id="providerList">
@@ -30,11 +30,14 @@
           </datalist>
         </label>
         <button id="applyBtn" type="button">应用到选中项</button>
+        <button id="selectArchivedBtn" type="button">选中项归档</button>
+        <button id="toggleArchivedBtn" type="button">查看归档区</button>
+        <button id="deleteArchivedBtn" type="button" class="danger-button hidden">一键选中删除</button>
       </section>
 
       <section class="message-row">
         <section id="message" class="message" aria-live="polite"></section>
-        <div class="backup-actions">
+        <div id="backupActions" class="backup-actions">
           <button id="openBackupBtn" type="button">打开备份目录</button>
           <button id="keepBackupsBtn" type="button">保留3次备份</button>
           <button id="clearBackupsBtn" type="button" class="danger-button">一键全清</button>
@@ -42,20 +45,48 @@
       </section>
 
       <section class="table-wrap">
-        <table>
+        <table id="threadTable">
+          <colgroup>
+            <col class="check-col" />
+            <col data-column="title" />
+            <col data-column="model_provider" />
+            <col data-column="rollout_provider" />
+            <col data-column="tokens_used" />
+            <col data-column="updated_at" />
+            <col data-column="cwd" />
+            <col data-column="rollout_path" />
+            <col data-column="rollout_actions" />
+          </colgroup>
           <thead>
             <tr>
               <th><input id="selectAll" type="checkbox" /></th>
-              <th>title</th>
-              <th>model_provider</th>
-              <th>rollout provider</th>
-              <th>updated_at</th>
-              <th>cwd</th>
-              <th>rollout_path</th>
+              <th data-resizable="title">标题</th>
+              <th data-resizable="model_provider">项目拥有者</th>
+              <th data-resizable="rollout_provider">记录拥有者</th>
+              <th data-resizable="tokens_used">消耗token</th>
+              <th data-resizable="updated_at">更新日期</th>
+              <th data-resizable="cwd">工作区</th>
+              <th data-resizable="rollout_path">记录位置</th>
+              <th data-resizable="rollout_actions">记录文件操作</th>
             </tr>
           </thead>
           <tbody id="threadBody"></tbody>
         </table>
+      </section>
+      <section class="pagination-bar" aria-label="分页">
+        <label>
+          每页
+          <select id="pageSizeSelect">
+            <option value="5" selected>5项</option>
+            <option value="10">10项</option>
+            <option value="20">20项</option>
+          </select>
+        </label>
+        <span id="pageStatus"></span>
+        <div class="pagination-actions">
+          <button id="prevPageBtn" type="button">上一页</button>
+          <button id="nextPageBtn" type="button">下一页</button>
+        </div>
       </section>
 
       <dialog id="rolloutDialog">
@@ -110,6 +141,26 @@
           <div class="confirm-actions">
             <button id="cancelClearBtn" type="button">取消</button>
             <button id="confirmClearBtn" type="button" class="danger-button">确认清空</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="deleteArchivedDialog" class="confirm-dialog">
+        <form method="dialog" class="confirm-body">
+          <header class="dialog-header">
+            <div>
+              <h2>删除归档记录</h2>
+              <p>只删除 threads 表里的已归档记录，不删除 rollout 文件。输入“确认删除”后才会执行。</p>
+            </div>
+            <button id="closeDeleteArchivedDialogBtn" type="button" title="关闭">×</button>
+          </header>
+          <label>
+            确认文本
+            <input id="deleteArchivedConfirmInput" type="text" autocomplete="off" />
+          </label>
+          <div class="confirm-actions">
+            <button id="cancelDeleteArchivedBtn" type="button">取消</button>
+            <button id="confirmDeleteArchivedBtn" type="button" class="danger-button">确认删除</button>
           </div>
         </form>
       </dialog>
