@@ -130,7 +130,6 @@
           <header class="dialog-header">
             <div>
               <h2>清空备份</h2>
-              <p>输入“确认清空”后才会删除全部备份目录。</p>
             </div>
             <button id="closeClearDialogBtn" type="button" title="关闭">×</button>
           </header>
@@ -138,6 +137,7 @@
             确认文本
             <input id="clearConfirmInput" type="text" autocomplete="off" />
           </label>
+          <p class="confirm-note">输入“确认清空”后才会删除全部备份目录。</p>
           <div class="confirm-actions">
             <button id="cancelClearBtn" type="button">取消</button>
             <button id="confirmClearBtn" type="button" class="danger-button">确认清空</button>
@@ -150,7 +150,6 @@
           <header class="dialog-header">
             <div>
               <h2>删除归档记录</h2>
-              <p>只删除 threads 表里的已归档记录，不删除 rollout 文件。输入“确认删除”后才会执行。</p>
             </div>
             <button id="closeDeleteArchivedDialogBtn" type="button" title="关闭">×</button>
           </header>
@@ -158,6 +157,7 @@
             确认文本
             <input id="deleteArchivedConfirmInput" type="text" autocomplete="off" />
           </label>
+          <p class="confirm-note">只删除 threads 表里的已归档记录，不删除 rollout 文件。输入“确认删除”后才会执行。</p>
           <div class="confirm-actions">
             <button id="cancelDeleteArchivedBtn" type="button">取消</button>
             <button id="confirmDeleteArchivedBtn" type="button" class="danger-button">确认删除</button>

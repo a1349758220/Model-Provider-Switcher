@@ -351,16 +351,25 @@ dialog {
 .confirm-dialog {
   width: min(520px, calc(100vw - 36px));
   height: auto;
+  min-height: 400px;
 }
 
 .confirm-body {
   display: grid;
   gap: 14px;
   padding: 16px;
+  min-height: 400px;
+  align-content: start;
 }
 
 .confirm-body input {
   width: 100%;
+}
+
+.confirm-note {
+  color: #66707d;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .confirm-actions {
