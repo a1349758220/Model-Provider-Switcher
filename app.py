@@ -12,7 +12,17 @@ from urllib.parse import parse_qs, urlparse
 
 APP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = APP_DIR / "static"
+LOCALES_DIR = STATIC_DIR / "locales"
 DB_FILE_NAME = "state_5.sqlite"
+ROLLOUT_PREVIEW_LIMIT = 10000
+SERVER_TEXT = json.loads((LOCALES_DIR / "zh-CN.json").read_text(encoding="utf-8"))
+
+
+def server_text(key: str) -> str:
+    value = SERVER_TEXT.get(key)
+    if not isinstance(value, str):
+        raise KeyError(key)
+    return value
 
 
 def codex_dir_candidates() -> list[Path]:
@@ -57,6 +67,21 @@ def locate_codex_home() -> Path:
 CODEX_HOME = locate_codex_home()
 DB_PATH = CODEX_HOME / DB_FILE_NAME
 BACKUP_ROOT = CODEX_HOME / "backups" / "model-provider-switcher"
+
+
+def set_database_path(path: Path) -> None:
+    global CODEX_HOME, DB_PATH, BACKUP_ROOT
+    if not path.is_file():
+        raise FileNotFoundError(str(path))
+    with sqlite3.connect(path) as con:
+        row = con.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'threads'"
+        ).fetchone()
+    if row is None:
+        raise ValueError("selected sqlite file does not contain threads table")
+    CODEX_HOME = path.parent
+    DB_PATH = path
+    BACKUP_ROOT = CODEX_HOME / "backups" / "model-provider-switcher"
 
 
 def connect() -> sqlite3.Connection:
@@ -153,8 +178,8 @@ def thread_rows(search: str, limit: int, offset: int, archived_only: bool) -> li
 
 
 def delete_archived_threads(ids: list[str], confirm_text: str) -> dict:
-    if confirm_text != "确认删除":
-        raise ValueError("confirm_text must be 确认删除")
+    if confirm_text != server_text("confirm.deleteToken"):
+        raise ValueError(f"confirm_text must be {server_text('confirm.deleteToken')}")
     if not ids:
         raise ValueError("ids is required")
 
@@ -379,29 +404,15 @@ def read_rollout_text(thread_id: str) -> dict:
     path = Path(row["rollout_path"])
     if not path.is_file():
         raise FileNotFoundError(str(path))
+    with path.open("r", encoding="utf-8") as f:
+        preview = f.read(ROLLOUT_PREVIEW_LIMIT + 1)
+    truncated = len(preview) > ROLLOUT_PREVIEW_LIMIT
     return {
         "id": row["id"],
         "rollout_path": str(path),
-        "content": path.read_text(encoding="utf-8"),
-        "rollout_provider": read_rollout_provider(path),
-    }
-
-
-def save_rollout_text(thread_id: str, content: str) -> dict:
-    if not isinstance(content, str):
-        raise ValueError("content must be a string")
-    row = get_thread(thread_id)
-    path = Path(row["rollout_path"])
-    if not path.is_file():
-        raise FileNotFoundError(str(path))
-
-    target_dir = timestamp_dir()
-    file_backup = backup_file(path, target_dir)
-    path.write_text(content, encoding="utf-8", newline="\n")
-    return {
-        "id": row["id"],
-        "rollout_path": str(path),
-        "file_backup": str(file_backup),
+        "content": preview[:ROLLOUT_PREVIEW_LIMIT],
+        "truncated": truncated,
+        "preview_limit": ROLLOUT_PREVIEW_LIMIT,
         "rollout_provider": read_rollout_provider(path),
     }
 
@@ -426,6 +437,26 @@ def select_rollout_file(thread_id: str) -> dict:
     if not selected:
         return {"id": row["id"], "selected": None}
     return update_rollout_path(thread_id, selected)
+
+
+def select_database_file() -> dict:
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    selected = filedialog.askopenfilename(
+        title=server_text("dialog.selectDatabaseTitle"),
+        initialdir=str(DB_PATH.parent),
+        filetypes=[("SQLite files", "*.sqlite *.db"), ("All files", "*.*")],
+    )
+    root.destroy()
+    if not selected:
+        return {"selected": None, "db_path": str(DB_PATH)}
+
+    set_database_path(Path(selected))
+    return {"selected": True, "db_path": str(DB_PATH)}
 
 
 def update_rollout_path(thread_id: str, rollout_path: str) -> dict:
@@ -514,8 +545,8 @@ def cleanup_backups_keep(keep: int) -> dict:
 
 
 def cleanup_backups_all(confirm_text: str) -> dict:
-    if confirm_text != "确认清空":
-        raise ValueError("confirm_text must be 确认清空")
+    if confirm_text != server_text("confirm.clearToken"):
+        raise ValueError(f"confirm_text must be {server_text('confirm.clearToken')}")
     return cleanup_backups_keep(0)
 
 
@@ -545,6 +576,18 @@ class Handler(BaseHTTPRequestHandler):
                     200,
                     (STATIC_DIR / "app.js").read_text(encoding="utf-8"),
                     "application/javascript; charset=utf-8",
+                )
+                return
+            if parsed.path.startswith("/locales/") and parsed.path.endswith(".json"):
+                locale_name = Path(parsed.path).name
+                if locale_name not in {"zh-CN.json", "en-US.json"}:
+                    json_response(self, 404, {"error": "not found"})
+                    return
+                text_response(
+                    self,
+                    200,
+                    (LOCALES_DIR / locale_name).read_text(encoding="utf-8"),
+                    "application/json; charset=utf-8",
                 )
                 return
             if parsed.path == "/api/threads":
@@ -586,8 +629,11 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/api/rollout/raw":
                 query = parse_qs(parsed.query)
                 thread_id = query.get("id", [""])[0]
-                data = read_rollout_text(thread_id)
-                text_response(self, 200, data["content"], "text/plain; charset=utf-8")
+                row = get_thread(thread_id)
+                path = Path(row["rollout_path"])
+                if not path.is_file():
+                    raise FileNotFoundError(str(path))
+                text_response(self, 200, path.read_text(encoding="utf-8"), "text/plain; charset=utf-8")
                 return
             json_response(self, 404, {"error": "not found"})
         except Exception as exc:
@@ -612,13 +658,8 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("ids must be a string array")
                 json_response(self, 200, archive_threads(ids))
                 return
-            if path == "/api/rollout/save":
-                data = read_body(self)
-                thread_id = data.get("id")
-                content = data.get("content")
-                if not isinstance(thread_id, str):
-                    raise ValueError("id must be a string")
-                json_response(self, 200, save_rollout_text(thread_id, content))
+            if path == "/api/database/select":
+                json_response(self, 200, select_database_file())
                 return
             if path == "/api/rollout/select":
                 data = read_body(self)
@@ -626,14 +667,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(thread_id, str):
                     raise ValueError("id must be a string")
                 json_response(self, 200, select_rollout_file(thread_id))
-                return
-            if path == "/api/rollout/path":
-                data = read_body(self)
-                thread_id = data.get("id")
-                rollout_path = data.get("rollout_path")
-                if not isinstance(thread_id, str):
-                    raise ValueError("id must be a string")
-                json_response(self, 200, update_rollout_path(thread_id, rollout_path))
                 return
             if path == "/api/backups/open":
                 json_response(self, 200, open_backup_root())

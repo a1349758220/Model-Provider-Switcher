@@ -3,44 +3,53 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>codex记录切换工具</title>
+    <title></title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="toolbar">
         <div>
-          <h1>codex记录切换工具</h1>
-          <p id="dbPath"></p>
+          <h1 data-i18n="app.title"></h1>
+          <div class="db-row">
+            <p id="dbPath"></p>
+            <button id="selectDbBtn" type="button" data-i18n="button.selectDatabase"></button>
+          </div>
         </div>
-        <button id="refreshBtn" type="button" title="刷新">↻</button>
+        <div class="toolbar-actions">
+          <label class="language-control">
+            <span data-i18n="language.label"></span>
+            <select id="languageSelect">
+              <option value="zh-CN" data-i18n="language.zhCN"></option>
+              <option value="en-US" data-i18n="language.enUS"></option>
+            </select>
+          </label>
+          <button id="refreshBtn" type="button" data-i18n-title="button.refreshTitle">↻</button>
+        </div>
       </header>
 
       <section class="controls">
         <label>
-          搜索
-          <input id="searchInput" type="search" placeholder="标题 / 项目拥有者 / 记录拥有者 / 工作区 / 记录位置" />
+          <span data-i18n="label.search"></span>
+          <input id="searchInput" type="search" data-i18n-placeholder="placeholder.search" />
         </label>
         <label id="providerControl">
-          输入拥有者
+          <span><span data-i18n="label.providerOwner"></span><span class="label-note" data-i18n="note.providerOwner"></span></span>
           <input id="providerInput" type="text" value="openai" list="providerList" placeholder="openai / custom" />
           <datalist id="providerList">
             <option value="openai"></option>
             <option value="custom"></option>
           </datalist>
         </label>
-        <button id="applyBtn" type="button">应用到选中项</button>
-        <button id="selectArchivedBtn" type="button">选中项归档</button>
-        <button id="toggleArchivedBtn" type="button">查看归档区</button>
-        <button id="deleteArchivedBtn" type="button" class="danger-button hidden">一键选中删除</button>
+        <button id="applyBtn" type="button" data-i18n="button.applySelected"></button>
       </section>
 
       <section class="message-row">
         <section id="message" class="message" aria-live="polite"></section>
         <div id="backupActions" class="backup-actions">
-          <button id="openBackupBtn" type="button">打开备份目录</button>
-          <button id="keepBackupsBtn" type="button">保留3次备份</button>
-          <button id="clearBackupsBtn" type="button" class="danger-button">一键全清</button>
+          <button id="openBackupBtn" type="button" data-i18n="button.openBackup"></button>
+          <button id="keepBackupsBtn" type="button" data-i18n="button.keepBackups"></button>
+          <button id="clearBackupsBtn" type="button" class="danger-button" data-i18n="button.clearBackups"></button>
         </div>
       </section>
 
@@ -60,32 +69,32 @@
           <thead>
             <tr>
               <th><input id="selectAll" type="checkbox" /></th>
-              <th data-resizable="title">标题</th>
-              <th data-resizable="model_provider">项目拥有者</th>
-              <th data-resizable="rollout_provider">记录拥有者</th>
-              <th data-resizable="tokens_used">消耗token</th>
-              <th data-resizable="updated_at">更新日期</th>
-              <th data-resizable="cwd">工作区</th>
-              <th data-resizable="rollout_path">记录位置</th>
-              <th data-resizable="rollout_actions">记录文件操作</th>
+              <th data-resizable="title" data-i18n="table.title"></th>
+              <th data-resizable="model_provider" data-i18n="table.projectOwner"></th>
+              <th data-resizable="rollout_provider" data-i18n="table.recordOwner"></th>
+              <th data-resizable="tokens_used" data-i18n="table.tokensUsed"></th>
+              <th data-resizable="updated_at" data-i18n="table.updatedAt"></th>
+              <th data-resizable="cwd" data-i18n="table.workspace"></th>
+              <th data-resizable="rollout_path" data-i18n="table.recordPath"></th>
+              <th data-resizable="rollout_actions" data-i18n="table.fileActions"></th>
             </tr>
           </thead>
           <tbody id="threadBody"></tbody>
         </table>
       </section>
-      <section class="pagination-bar" aria-label="分页">
+      <section class="pagination-bar" data-i18n-aria-label="pagination.ariaLabel">
         <label>
-          每页
+          <span data-i18n="pagination.pageSize"></span>
           <select id="pageSizeSelect">
-            <option value="5" selected>5项</option>
-            <option value="10">10项</option>
-            <option value="20">20项</option>
+            <option value="5" selected data-i18n="pagination.option5"></option>
+            <option value="10" data-i18n="pagination.option10"></option>
+            <option value="20" data-i18n="pagination.option20"></option>
           </select>
         </label>
-        <span id="pageStatus"></span>
+        <!--<span id="pageStatus"></span>-->
         <div class="pagination-actions">
-          <button id="prevPageBtn" type="button">上一页</button>
-          <button id="nextPageBtn" type="button">下一页</button>
+          <button id="prevPageBtn" type="button" data-i18n="pagination.prev"></button>
+          <button id="nextPageBtn" type="button" data-i18n="pagination.next"></button>
         </div>
       </section>
 
@@ -93,34 +102,33 @@
         <form method="dialog" class="dialog-body">
           <header class="dialog-header">
             <div>
-              <h2>日志文件</h2>
+              <h2 data-i18n="dialog.rolloutTitle"></h2>
               <p id="editorThreadId"></p>
             </div>
-            <button id="closeEditorBtn" type="button" title="关闭">×</button>
+            <button id="closeEditorBtn" type="button" data-i18n-title="button.closeTitle">×</button>
           </header>
           <label class="path-editor">
-            文件路径
-            <input id="rolloutPathInput" type="text" />
+            <span data-i18n="label.filePath"></span>
+            <input id="rolloutPathInput" type="text" readonly />
           </label>
           <div class="dialog-actions">
             <div class="dialog-action-group">
-              <button id="savePathBtn" type="button">保存路径</button>
-              <button id="selectPathBtn" type="button">选择文件</button>
-              <a id="rawLink" target="_blank" rel="noreferrer">浏览器打开</a>
+              <button id="selectPathBtn" type="button" data-i18n="button.selectFile"></button>
+              <a id="rawLink" target="_blank" rel="noreferrer" data-i18n="button.openInBrowser"></a>
             </div>
             <div class="dialog-action-group">
               <span id="matchStatus" class="match-status"></span>
               <label class="inline-toggle">
                 <input id="wrapToggle" type="checkbox" checked />
-                自动换行
+                <span data-i18n="label.wrapLines"></span>
               </label>
-              <button id="locateMatchBtn" type="button">定位</button>
-              <button id="saveRolloutBtn" type="button">保存内容</button>
+              <button id="locateMatchBtn" type="button" data-i18n="button.locate"></button>
             </div>
           </div>
+          <section id="rolloutPreviewNotice" class="preview-notice" data-i18n="notice.rolloutPreview"></section>
           <div id="editorWrap" class="editor-wrap wrap-lines">
             <pre id="highlightLayer" aria-hidden="true"></pre>
-            <textarea id="rolloutEditor" spellcheck="false" wrap="soft"></textarea>
+            <textarea id="rolloutEditor" spellcheck="false" wrap="soft" readonly></textarea>
           </div>
         </form>
       </dialog>
@@ -129,18 +137,18 @@
         <form method="dialog" class="confirm-body">
           <header class="dialog-header">
             <div>
-              <h2>一键备份全清</h2>
+              <h2 data-i18n="dialog.clearBackupsTitle"></h2>
             </div>
-            <button id="closeClearDialogBtn" type="button" title="关闭">×</button>
+            <button id="closeClearDialogBtn" type="button" data-i18n-title="button.closeTitle">×</button>
           </header>
           <label>
-            确认文本
+            <span data-i18n="label.confirmText"></span>
             <input id="clearConfirmInput" type="text" autocomplete="off" />
           </label>
-          <p class="confirm-note">输入“确认清空”后才会删除全部备份目录。</p>
+          <p class="confirm-note" data-i18n="note.clearBackups"></p>
           <div class="confirm-actions">
-            <button id="cancelClearBtn" type="button">取消</button>
-            <button id="confirmClearBtn" type="button" class="danger-button">确认清空</button>
+            <button id="cancelClearBtn" type="button" data-i18n="button.cancel"></button>
+            <button id="confirmClearBtn" type="button" class="danger-button" data-i18n="button.confirmClear"></button>
           </div>
         </form>
       </dialog>
@@ -149,18 +157,18 @@
         <form method="dialog" class="confirm-body">
           <header class="dialog-header">
             <div>
-              <h2>删除归档记录</h2>
+              <h2 data-i18n="dialog.deleteArchivedTitle"></h2>
             </div>
-            <button id="closeDeleteArchivedDialogBtn" type="button" title="关闭">×</button>
+            <button id="closeDeleteArchivedDialogBtn" type="button" data-i18n-title="button.closeTitle">×</button>
           </header>
           <label>
-            确认文本
+            <span data-i18n="label.confirmText"></span>
             <input id="deleteArchivedConfirmInput" type="text" autocomplete="off" />
           </label>
-          <p class="confirm-note">只删除 threads 表里的已归档记录，不删除 rollout 文件。输入“确认删除”后才会执行。</p>
+          <p class="confirm-note" data-i18n="note.deleteArchived"></p>
           <div class="confirm-actions">
-            <button id="cancelDeleteArchivedBtn" type="button">取消</button>
-            <button id="confirmDeleteArchivedBtn" type="button" class="danger-button">确认删除</button>
+            <button id="cancelDeleteArchivedBtn" type="button" data-i18n="button.cancel"></button>
+            <button id="confirmDeleteArchivedBtn" type="button" class="danger-button" data-i18n="button.confirmDelete"></button>
           </div>
         </form>
       </dialog>
@@ -169,9 +177,9 @@
         <form method="dialog" class="confirm-body">
           <header class="dialog-header">
             <div>
-              <h2>完整标题</h2>
+              <h2 data-i18n="dialog.fullTitle"></h2>
             </div>
-            <button id="closeTitleDialogBtn" type="button" title="关闭">×</button>
+            <button id="closeTitleDialogBtn" type="button" data-i18n-title="button.closeTitle">×</button>
           </header>
           <p id="fullTitleText" class="full-title"></p>
         </form>

@@ -15,6 +15,24 @@ This is a small browser-server tool for updating:
 - rollout JSONL file from column: `rollout_path`
 - JSON path in rollout lines: `payload.model_provider`
 
+## Features
+
+- Detects the Codex data/config directory at startup and opens `state_5.sqlite` by default.
+- Allows selecting another sqlite file. The selected file must contain a `threads` table.
+- Lists `threads` records with pagination and resizable table columns.
+- Shows `tokens_used`, workspace, rollout path, and owner consistency status.
+- Updates selected records' `model_provider` and the matching rollout file content.
+- Lets users select a new rollout file path. The selected path is saved to the database.
+- Opens rollout files in a read-only preview. The preview loads at most the first 10000 characters.
+- Provides a browser-open link for viewing the full rollout file.
+- Creates backups before database and rollout-path/model-provider changes.
+- Supports backup folder opening and cleanup.
+- Supports language switching with JSON locale files:
+  - `static/locales/zh-CN.json`
+  - `static/locales/en-US.json`
+
+Default language is Chinese (Simplified).
+
 ## Run
 
 ```powershell
@@ -37,3 +55,9 @@ C:\Users\Administrator\.codex\backups\model-provider-switcher
 ```
 
 The database is backed up with SQLite's backup API. Every touched rollout file is copied before it is rewritten.
+
+## Notes
+
+- The rollout preview is intentionally read-only.
+- The old direct "save content" and manual "save path" controls are not exposed.
+- For large rollout files, use the browser-open link or a local editor to inspect the full content.
