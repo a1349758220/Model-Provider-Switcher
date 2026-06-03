@@ -354,12 +354,25 @@ dialog {
   min-height: 400px;
 }
 
+#clearBackupDialog,
+#titleDialog {
+  height: 400px;
+  max-height: calc(100vh - 36px);
+}
+
 .confirm-body {
   display: grid;
   gap: 14px;
   padding: 16px;
   min-height: 400px;
   align-content: start;
+}
+
+#clearBackupDialog .confirm-body,
+#titleDialog .confirm-body {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .confirm-body input {

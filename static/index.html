@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Model Provider Switcher</title>
+    <title>codex记录切换工具</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main class="app-shell">
       <header class="toolbar">
         <div>
-          <h1>Model Provider Switcher</h1>
+          <h1>codex记录切换工具</h1>
           <p id="dbPath"></p>
         </div>
         <button id="refreshBtn" type="button" title="刷新">↻</button>
@@ -19,11 +19,11 @@
       <section class="controls">
         <label>
           搜索
-          <input id="searchInput" type="search" placeholder="id / title / provider / cwd / rollout_path" />
+          <input id="searchInput" type="search" placeholder="标题 / 项目拥有者 / 记录拥有者 / 工作区 / 记录位置" />
         </label>
         <label id="providerControl">
-          新 model_provider
-          <input id="providerInput" type="text" value="openai" list="providerList" />
+          输入拥有者
+          <input id="providerInput" type="text" value="openai" list="providerList" placeholder="openai / custom" />
           <datalist id="providerList">
             <option value="openai"></option>
             <option value="custom"></option>
@@ -93,7 +93,7 @@
         <form method="dialog" class="dialog-body">
           <header class="dialog-header">
             <div>
-              <h2>rollout_path</h2>
+              <h2>日志文件</h2>
               <p id="editorThreadId"></p>
             </div>
             <button id="closeEditorBtn" type="button" title="关闭">×</button>
@@ -129,7 +129,7 @@
         <form method="dialog" class="confirm-body">
           <header class="dialog-header">
             <div>
-              <h2>清空备份</h2>
+              <h2>一键备份全清</h2>
             </div>
             <button id="closeClearDialogBtn" type="button" title="关闭">×</button>
           </header>
