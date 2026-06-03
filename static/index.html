@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Model Provider Switcher</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="toolbar">
+        <div>
+          <h1>Model Provider Switcher</h1>
+          <p id="dbPath"></p>
+        </div>
+        <button id="refreshBtn" type="button" title="刷新">↻</button>
+      </header>
+
+      <section class="controls">
+        <label>
+          搜索
+          <input id="searchInput" type="search" placeholder="id / title / provider / cwd / rollout_path" />
+        </label>
+        <label>
+          新 model_provider
+          <input id="providerInput" type="text" value="openai" list="providerList" />
+          <datalist id="providerList">
+            <option value="openai"></option>
+            <option value="custom"></option>
+          </datalist>
+        </label>
+        <button id="applyBtn" type="button">应用到选中项</button>
+      </section>
+
+      <section class="message-row">
+        <section id="message" class="message" aria-live="polite"></section>
+        <div class="backup-actions">
+          <button id="openBackupBtn" type="button">打开备份目录</button>
+          <button id="keepBackupsBtn" type="button">保留3次备份</button>
+          <button id="clearBackupsBtn" type="button" class="danger-button">一键全清</button>
+        </div>
+      </section>
+
+      <section class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input id="selectAll" type="checkbox" /></th>
+              <th>title</th>
+              <th>model_provider</th>
+              <th>rollout provider</th>
+              <th>updated_at</th>
+              <th>cwd</th>
+              <th>rollout_path</th>
+            </tr>
+          </thead>
+          <tbody id="threadBody"></tbody>
+        </table>
+      </section>
+
+      <dialog id="rolloutDialog">
+        <form method="dialog" class="dialog-body">
+          <header class="dialog-header">
+            <div>
+              <h2>rollout_path</h2>
+              <p id="editorThreadId"></p>
+            </div>
+            <button id="closeEditorBtn" type="button" title="关闭">×</button>
+          </header>
+          <label class="path-editor">
+            文件路径
+            <input id="rolloutPathInput" type="text" />
+          </label>
+          <div class="dialog-actions">
+            <div class="dialog-action-group">
+              <button id="savePathBtn" type="button">保存路径</button>
+              <button id="selectPathBtn" type="button">选择文件</button>
+              <a id="rawLink" target="_blank" rel="noreferrer">浏览器打开</a>
+            </div>
+            <div class="dialog-action-group">
+              <span id="matchStatus" class="match-status"></span>
+              <button id="prevMatchBtn" type="button">上一个</button>
+              <button id="nextMatchBtn" type="button">下一个</button>
+              <button id="saveRolloutBtn" type="button">保存内容</button>
+            </div>
+          </div>
+          <div class="editor-wrap">
+            <pre id="highlightLayer" aria-hidden="true"></pre>
+            <textarea id="rolloutEditor" spellcheck="false" wrap="off"></textarea>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="clearBackupDialog" class="confirm-dialog">
+        <form method="dialog" class="confirm-body">
+          <header class="dialog-header">
+            <div>
+              <h2>清空备份</h2>
+              <p>输入“确认清空”后才会删除全部备份目录。</p>
+            </div>
+            <button id="closeClearDialogBtn" type="button" title="关闭">×</button>
+          </header>
+          <label>
+            确认文本
+            <input id="clearConfirmInput" type="text" autocomplete="off" />
+          </label>
+          <div class="confirm-actions">
+            <button id="cancelClearBtn" type="button">取消</button>
+            <button id="confirmClearBtn" type="button" class="danger-button">确认清空</button>
+          </div>
+        </form>
+      </dialog>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
