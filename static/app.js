@@ -22,8 +22,7 @@ const savePathBtn = document.querySelector("#savePathBtn");
 const rawLink = document.querySelector("#rawLink");
 const highlightLayer = document.querySelector("#highlightLayer");
 const matchStatus = document.querySelector("#matchStatus");
-const prevMatchBtn = document.querySelector("#prevMatchBtn");
-const nextMatchBtn = document.querySelector("#nextMatchBtn");
+const locateMatchBtn = document.querySelector("#locateMatchBtn");
 const openBackupBtn = document.querySelector("#openBackupBtn");
 const keepBackupsBtn = document.querySelector("#keepBackupsBtn");
 const clearBackupsBtn = document.querySelector("#clearBackupsBtn");
@@ -32,6 +31,8 @@ const closeClearDialogBtn = document.querySelector("#closeClearDialogBtn");
 const cancelClearBtn = document.querySelector("#cancelClearBtn");
 const confirmClearBtn = document.querySelector("#confirmClearBtn");
 const clearConfirmInput = document.querySelector("#clearConfirmInput");
+const editorWrap = document.querySelector("#editorWrap");
+const wrapToggle = document.querySelector("#wrapToggle");
 
 let currentEditorId = null;
 let modelProviderMatches = [];
@@ -120,12 +121,46 @@ function renderHighlights() {
   highlightLayer.scrollLeft = rolloutEditor.scrollLeft;
 
   const found = modelProviderMatches.length > 0;
-  prevMatchBtn.disabled = !found;
-  nextMatchBtn.disabled = !found;
+  locateMatchBtn.disabled = !found;
   matchStatus.classList.toggle("missing", !found);
   matchStatus.textContent = found
     ? `找到 model_provider：${modelProviderMatches.length} 处`
     : "可能未找到 model_provider 文本，请自行判断文件是否正确";
+}
+
+function editorMetrics() {
+  const style = getComputedStyle(rolloutEditor);
+  const probe = document.createElement("span");
+  probe.textContent = "MMMMMMMMMM";
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.fontFamily = style.fontFamily;
+  probe.style.fontSize = style.fontSize;
+  probe.style.fontWeight = style.fontWeight;
+  probe.style.letterSpacing = style.letterSpacing;
+  document.body.append(probe);
+  const charWidth = probe.getBoundingClientRect().width / 10 || 7.2;
+  probe.remove();
+  const lineHeight = parseFloat(style.lineHeight) || 18;
+  const horizontalPadding =
+    parseFloat(style.paddingLeft || "0") + parseFloat(style.paddingRight || "0");
+  return {
+    charWidth,
+    lineHeight,
+    usableWidth: Math.max(1, rolloutEditor.clientWidth - horizontalPadding),
+  };
+}
+
+function applyWrapMode() {
+  const enabled = wrapToggle.checked;
+  editorWrap.classList.toggle("wrap-lines", enabled);
+  editorWrap.classList.toggle("no-wrap", !enabled);
+  rolloutEditor.wrap = enabled ? "soft" : "off";
+  localStorage.setItem("rolloutEditorWrap", enabled ? "1" : "0");
+  renderHighlights();
+  if (modelProviderMatches.length > 0) {
+    focusMatch(0);
+  }
 }
 
 function focusMatch(offset) {
@@ -137,9 +172,20 @@ function focusMatch(offset) {
   rolloutEditor.setSelectionRange(item.start, item.end);
 
   const before = rolloutEditor.value.slice(0, item.start);
-  const line = before.split("\n").length - 1;
-  const lineHeight = parseFloat(getComputedStyle(rolloutEditor).lineHeight) || 18;
-  rolloutEditor.scrollTop = Math.max(0, line * lineHeight - rolloutEditor.clientHeight / 3);
+  const lines = before.split("\n");
+  const line = lines.length - 1;
+  const column = lines[lines.length - 1].length;
+  const metrics = editorMetrics();
+  let visualLine = line;
+  if (wrapToggle.checked) {
+    const charsPerLine = Math.max(1, Math.floor(metrics.usableWidth / metrics.charWidth));
+    visualLine += Math.floor(column / charsPerLine);
+    rolloutEditor.scrollLeft = 0;
+  } else {
+    const targetLeft = column * metrics.charWidth - rolloutEditor.clientWidth / 3;
+    rolloutEditor.scrollLeft = Math.max(0, targetLeft);
+  }
+  rolloutEditor.scrollTop = Math.max(0, visualLine * metrics.lineHeight - rolloutEditor.clientHeight / 3);
   highlightLayer.scrollTop = rolloutEditor.scrollTop;
   highlightLayer.scrollLeft = rolloutEditor.scrollLeft;
 }
@@ -268,6 +314,7 @@ async function applyProvider() {
 
 async function openRolloutEditor(id) {
   currentEditorId = id;
+  currentMatchIndex = 0;
   editorThreadId.textContent = id;
   rolloutEditor.value = "加载中...";
   renderHighlights();
@@ -434,14 +481,14 @@ closeEditorBtn.addEventListener("click", () => rolloutDialog.close());
 saveRolloutBtn.addEventListener("click", saveRolloutContent);
 selectPathBtn.addEventListener("click", () => selectRolloutFile());
 savePathBtn.addEventListener("click", saveRolloutPath);
-prevMatchBtn.addEventListener("click", () => focusMatch(-1));
-nextMatchBtn.addEventListener("click", () => focusMatch(1));
+locateMatchBtn.addEventListener("click", () => focusMatch(1));
 openBackupBtn.addEventListener("click", openBackupDirectory);
 keepBackupsBtn.addEventListener("click", keepThreeBackups);
 clearBackupsBtn.addEventListener("click", openClearBackupDialog);
 closeClearDialogBtn.addEventListener("click", () => clearBackupDialog.close());
 cancelClearBtn.addEventListener("click", () => clearBackupDialog.close());
 confirmClearBtn.addEventListener("click", clearAllBackups);
+wrapToggle.addEventListener("change", applyWrapMode);
 rolloutEditor.addEventListener("input", renderHighlights);
 rolloutEditor.addEventListener("scroll", () => {
   highlightLayer.scrollTop = rolloutEditor.scrollTop;
@@ -454,5 +501,7 @@ selectAll.addEventListener("change", () => {
 });
 
 renderProviderOptions();
+wrapToggle.checked = localStorage.getItem("rolloutEditorWrap") !== "0";
+applyWrapMode();
 loadThreads();
 loadBackupStatus();

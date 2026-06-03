@@ -79,14 +79,17 @@
             </div>
             <div class="dialog-action-group">
               <span id="matchStatus" class="match-status"></span>
-              <button id="prevMatchBtn" type="button">上一个</button>
-              <button id="nextMatchBtn" type="button">下一个</button>
+              <label class="inline-toggle">
+                <input id="wrapToggle" type="checkbox" checked />
+                自动换行
+              </label>
+              <button id="locateMatchBtn" type="button">定位</button>
               <button id="saveRolloutBtn" type="button">保存内容</button>
             </div>
           </div>
-          <div class="editor-wrap">
+          <div id="editorWrap" class="editor-wrap wrap-lines">
             <pre id="highlightLayer" aria-hidden="true"></pre>
-            <textarea id="rolloutEditor" spellcheck="false" wrap="off"></textarea>
+            <textarea id="rolloutEditor" spellcheck="false" wrap="soft"></textarea>
           </div>
         </form>
       </dialog>

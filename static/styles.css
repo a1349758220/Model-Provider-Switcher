@@ -274,6 +274,20 @@ dialog::backdrop {
   flex-wrap: wrap;
 }
 
+.inline-toggle {
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 4px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.inline-toggle input {
+  min-width: 0;
+}
+
 .dialog-header h2 {
   margin: 0 0 4px;
   font-size: 18px;
@@ -320,6 +334,17 @@ dialog::backdrop {
   line-height: 1.5;
   white-space: pre;
   tab-size: 2;
+}
+
+.editor-wrap.wrap-lines #highlightLayer,
+.editor-wrap.wrap-lines #rolloutEditor {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.editor-wrap.no-wrap #highlightLayer,
+.editor-wrap.no-wrap #rolloutEditor {
+  white-space: pre;
 }
 
 #highlightLayer {
